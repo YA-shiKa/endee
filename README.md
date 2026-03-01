@@ -1,385 +1,280 @@
-# Endee: High-Performance Open Source Vector Database
+# Endee-Powered Document Analysis AI
 
-**Endee (nD)** is a specialized, high-performance vector database built for speed and efficiency. This guide covers supported platforms, dependency requirements, and detailed build instructions using both our automated installer and manual CMake configuration.
-
-there are 3 ways to build and run endee:
-1. quick installation and run using install.sh and run.sh scripts
-2. manual build using cmake
-3. using docker
-
-also you can run endee using docker from docker hub without building it locally. refer to section 4 for more details.
+**Retrieval Augmented Generation (RAG) using Endee Vector Database** 
 
 ---
 
-## System Requirements
+## Project Overview
 
-Before installing, ensure your system meets the following hardware and operating system requirements.
+This project is a Document Question Answering System built using Endee (nD) Vector Database as the core vector search engine.
 
-### Supported Operating Systems
+Users can:
 
-* **Linux**: Ubuntu(22.04, 24.04, 25.04) Debian(12, 13), Rocky(8, 9, 10), Centos(8, 9, 10), Fedora(40, 42, 43)
-* **macOS**: Apple Silicon (M Series) only.
+- Upload a PDF document
+- Automatically extract and chunk text
+- Convert text into embeddings
+- Store embeddings in Endee
+- Ask questions about the document
+- Get accurate answers strictly grounded in document content
 
-### Required Dependencies
+The system uses a Retrieval Augmented Generation (RAG) pipeline where vector search retrieves relevant document chunks, and an LLM generates answers using only retrieved context.
 
-The following packages are required for compilation.
+---
+## Preview
 
- `clang-19`, `cmake`, `build-essential`, `libssl-dev`, `libcurl4-openssl-dev`
+https://github.com/user-attachments/assets/b2bd0b4a-9d1c-4231-af2c-36f4e41aa9b2
 
-> **Note:** The build system requires **Clang 19** (or a compatible recent Clang version) supporting C++20.
 
 ---
 
-## 1. Quick Installation (Recommended)
+## Problem Statement
 
-The easiest way to build **ndd** is using the included `install.sh` script. This script handles OS detection, dependency checks, and configuration automatically.
+Traditional document search relies on keyword matching, which:
 
-### Usage
+- Misses semantic meaning
+- Fails on paraphrased questions
+- Performs poorly on large documents
 
-First, ensure the script is executable:
-```bash
-chmod +x ./install.sh
-```
+This project solves that problem by:
 
-Run the script from the root of the repository. You **must** provide arguments for the build mode and/or CPU optimization.
+- Converting document text into vector embeddings
+- Storing them in Endee high-performance vector database
+- Performing semantic similarity search
+- Using retrieved context for accurate LLM-based answers
 
-```bash
-./install.sh [BUILD_MODE] [CPU_OPTIMIZATION]
-```
-
-### Build Arguments
-
-You can combine one **Build Mode** and one **CPU Optimization** flag.
-
-#### Build Modes
-
-| Flag | Description | CMake Equivalent |
-| --- | --- | --- |
-| `--release` | **Default.** Optimized release build. |  |
-| `--debug_all` | Enables full debugging symbols. | `-DND_DEBUG=ON -DDEBUG=ON` |
-| `--debug_nd` | Enables NDD-specific logging/timing. | `-DND_DEBUG=ON` |
-
-#### CPU Optimization Options
-
-Select the flag matching your hardware to enable SIMD optimizations.
-
-| Flag | Description | Target Hardware |
-| --- | --- | --- |
-| `--avx2` | Enables AVX2 (FMA, F16C) | Modern x86_64 Intel/AMD |
-| `--avx512` | Enables AVX512 (F, BW, VNNI, FP16) | Server-grade x86_64 (Xeon/Epyc) |
-| `--neon` | Enables NEON (FP16, DotProd) | Apple Silicon / ARMv8.2+ |
-| `--sve2` | Enables SVE2 (INT8/16, FP16) | ARMv9 / SVE2 compatible |
-
-> **Note:** The `--avx512` build configuration enforces mandatory runtime checks for specific instruction sets. To successfully run this build, your CPU must support **`avx512` (Foundation), `avx512_fp16`, `avx512_vnni`, `avx512bw`, and `avx512_vpopcntdq`**; if any of these extensions are missing, the database will fail to initialize and exit immediately to avoid runtime crashes.
-
-
-### Example Commands
-
-**Build for Production (Intel/AMD with AVX2):**
-
-```bash
-./install.sh --release --avx2
-```
-
-**Example Build for Debugging (Apple Silicon):**
-
-```bash
-./install.sh --debug_all --neon
-```
-
-### Running the Server
-
-We provide a `run.sh` script to simplify running the server. It automatically detects the built binary and uses `ndd_data_dir=./data` by default.
-
-First, ensure the script is executable:
-
-```bash
-chmod +x ./run.sh
-```
-
-Then run the script:
-
-```bash
-./run.sh
-```
-
-This will automatically identify the latest binary and start the server.
-
-#### Options
-
-You can override the defaults using arguments:
-
-*   `ndd_data_dir=DIR`: Set the data directory.
-*   `binary_file=FILE`: Set the binary file to run.
-*   `ndd_auth_token=TOKEN`: Set the authentication token (leave empty/ignore to run without authentication).
-
-#### Examples
-
-**Run with custom data directory:**
-
-```bash
-./run.sh ndd_data_dir=./my_data
-```
-
-**Run specific binary:**
-
-```bash
-./run.sh binary_file=./build/ndd-avx2
-```
-
-**Run with authentication token:**
-
-```bash
-./run.sh ndd_auth_token=your_token
-```
-
-
-**Run with all options**
-
-```bash
-./run.sh ndd_data_dir=./my_data binary_file=./build/ndd-avx2 ndd_auth_token=your_token
-```
-
-**For Help**
-
-```bash
-./run.sh --help
-```
-
-
-## 2. Manual Build (Advanced)
-
-If you prefer to configure the build manually or integrate it into an existing install pipeline, you can use `cmake` directly.
-
-### Step 1: Prepare Build Directory
-
-```bash
-mkdir build && cd build
-```
-
-### Step 2: Configure
-
-Run `cmake` with the appropriate flags. You must manually define the compiler if it is not your system default.
-
-**Configuration Flags:**
-
-* **Debug Options:**
-* `-DDEBUG=ON` (Enable debug symbols/O0)
-* `-DND_DEBUG=ON` (Enable internal logging)
-
-
-* **SIMD Selectors (Choose One):**
-* `-DUSE_AVX2=ON`
-* `-DUSE_AVX512=ON`
-* `-DUSE_NEON=ON`
-* `-DUSE_SVE2=ON`
-
-
-**Example (x86_64 AVX512 Release):**
-
-```bash
-cmake -DCMAKE_BUILD_TYPE=Release \
-      -DUSE_AVX512=ON \
-      ..
-```
-
-### Step 3: Compile
-
-```bash
-make -j$(nproc)
-```
-
-### Running the Built Binary
-
-After a successful build, the binary will be generated in the `build/` directory.
-
-### Binary Naming
-
-The output binary name depends on the SIMD flag used during compilation:
-
-* `ndd-avx2`
-* `ndd-avx512`
-* `ndd-neon` (or `ndd-neon-darwin` for mac)
-* `ndd-sve2`
-
-A symlink called `ndd` links to the binary compiled for the current build.
-
-### Runtime Environment Variables
-
-Some environment variables **ndd** reads at runtime:
-
-* `NDD_DATA_DIR`: Defines the data directory
-* `NDD_AUTH_TOKEN`: Optional authentication token (see below)
-
-### Authentication
-
-**ndd** supports two authentication modes:
-
-**Open Mode (No Authentication)** - Default when `NDD_AUTH_TOKEN` is not set:
-```bash
-# All APIs work without authentication
-./build/ndd
-curl http://{{BASE_URL}}/api/v1/index/list
-```
-
-**Token Mode** - When `NDD_AUTH_TOKEN` is set:
-```bash
-# Generate a secure token
-export NDD_AUTH_TOKEN=$(openssl rand -hex 32)
-./build/ndd
-
-# All protected APIs require the token in Authorization header
-curl -H "Authorization: $NDD_AUTH_TOKEN" http://{{BASE_URL}}/api/v1/index/list
-```
-
-### Execution Example
-
-To run the database using the AVX2 binary and a local `data` folder:
-
-```bash
-# 1. Create the data directory
-mkdir -p ./data
-
-# 2. Export the environment variable and run
-export NDD_DATA_DIR=$(pwd)/data
-./build/ndd
-```
-
-Alternatively, as a single line:
-
-```bash
-NDD_DATA_DIR=./data ./build/ndd
-```
+This ensures meaning-based retrieval instead of keyword matching.
 
 ---
 
+## System Architecture
 
+### Architecture Flow
 
-## 3. Docker Deployment
+1. User uploads PDF
+2. PDF text is extracted using PyPDF
+3. Text is chunked into smaller segments
+4. SentenceTransformer generates embeddings (384-dim)
+5. Embeddings stored in Endee
+6. User asks question
+7. Question embedding generated
+8. Endee performs similarity search (top-k)
+9. Retrieved context passed to Mistral (Ollama)
+10. LLM generates grounded answer
 
-We provide a Dockerfile for easy containerization. This ensures a consistent runtime environment and simplifies the deployment process across various platforms.
+### Tech Stack
+- Vector Database: Endee (nD)
+- Backend: FastAPI
+- Frontend: HTML + JS
+- Embedding Model: all-MiniLM-L6-v2 (SentenceTransformers)
+- LLM: Mistral (via Ollama)
+- PDF Parsing: PyPDF
+- Precision Mode: FLOAT16
 
-### Build the Image
+---
 
-You **must** specify the target architecture (`avx2`, `avx512`, `neon`, `sve2`) using the `BUILD_ARCH` build argument. You can optionally enable a debug build using the `DEBUG` argument.
+## System Design and Technical Approach
+### System Design Overview
+
+This project follows a modular Retrieval Augmented Generation (RAG) architecture where responsibilities are clearly separated into three core layers:
+
+- Ingestion Layer
+- Retrieval Layer (Endee Vector Search)
+- Generation Layer (LLM Response Engine)
+
+This layered design ensures scalability, maintainability, and clear separation of concerns.
+
+#### 1️⃣ Ingestion Layer
+
+The ingestion pipeline processes the uploaded document and prepares it for semantic retrieval.
+
+Steps:
+
+- PDF file uploaded via frontend
+- Text extracted using PyPDF
+- Extracted text cleaned and concatenated
+- Text divided into smaller chunks (~800–900 characters)
+- Each chunk converted into a 384-dimensional embedding
+- Embeddings stored in Endee along with original text as metadata
+
+Chunking:
+
+- Improves retrieval granularity
+- Reduces irrelevant context
+- Increases Top-K relevance
+- Prevents entire-document embedding noise
+
+#### 2️⃣ Retrieval Layer (Core: Endee Vector Database)
+
+This is the most critical component of the system.
+
+When a user submits a question:
+
+1. The question is converted into a 384-dimensional embedding.
+2. Endee performs cosine similarity search.
+3. Top-K most semantically similar chunks are retrieved.
+4. Retrieved chunks are combined to form contextual knowledge.
+```bash
+results = index.query(vector=query_vector, top_k=6)
+```
+Design Choices:
+- dimension=384 → Matches embedding model output
+- space_type="cosine" → Suitable for semantic similarity
+- precision=FLOAT16 → Optimized memory usage and faster computation
+- top_k=6 → Balanced retrieval depth without excessive noise
+
+Endee acts as the semantic memory layer of the system.
+
+#### 3️⃣ Generation Layer (LLM Integration)
+
+After retrieval, the system constructs a strictly controlled prompt that includes:
+- Retrieved context
+- User question
+- Explicit instructions to avoid hallucination
+  
+The LLM (Mistral via Ollama):
+
+- Uses only retrieved context
+- Does not rely on external knowledge
+- Returns deterministic responses (temperature = 0)
+- If answer is not found → responds with a fixed fallback message
+
+This ensures the system behaves like a grounded document QA engine, not a general chatbot.
+
+### Embedding Strategy
+- Model Used: sentence-transformers/all-MiniLM-L6-v2
+- Output Dimension: 384
+- Chosen because:
+  - Lightweight and fast
+  - Good semantic understanding
+  - Efficient for CPU inference
+  - Compatible with Endee configuration
+
+### Query Processing Pipeline
+
+The complete query lifecycle:
+
+- User submits question
+- Question converted to embedding
+- Endee retrieves similar chunks
+- Context constructed from Top-K results
+- Strict prompt generated
+- Mistral produces answer
+- Response returned to frontend
+- This ensures semantic retrieval + controlled generation.
+
+### Hallucination Control Strategy
+
+To prevent LLM hallucination:
+- Strict prompt instructions
+- Context-only answering
+- No tool usage allowed
+- Deterministic temperature setting
+- Fixed fallback message when answer not found
+
+This improves factual reliability.
+
+### Scalability Considerations
+
+The current architecture can be extended to support:
+
+- Multi-document indexing
+- Persistent vector storage
+- Hybrid search (keyword + vector)
+- Authentication-enabled Endee server
+- Distributed retrieval
+- Streaming LLM responses
+- The modular design ensures easy extension without major restructuring.
+  
+---
+
+## How Endee is Used 
+
+Endee is used as the primary vector storage and retrieval engine.
+
+### 1️⃣ Index Creation
+```bash
+client.create_index(
+    name="pdf_rag_index",
+    dimension=384,
+    space_type="cosine",
+    precision=Precision.FLOAT16
+)
+```
+
+- Dimension: 384 (matches MiniLM embedding size)
+- Similarity: Cosine
+- Precision: FLOAT16 for optimized performance
+
+### 2️⃣ Vector Upsert
+
+Each document chunk is embedded and stored:
 
 ```bash
-# Production Build (AVX2) (for x86_64 systems)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=avx2 -t endee-oss:latest -f ./infra/Dockerfile .
-
-# Debug Build (Neon) (for arm64, mac apple silicon)
-docker build --ulimit nofile=100000:100000 --build-arg BUILD_ARCH=neon --build-arg DEBUG=true -t endee-oss:latest -f ./infra/Dockerfile .
+index.upsert([{
+    "id": f"chunk_{i}",
+    "vector": vector,
+    "meta": {"text": chunk}
+}])
 ```
+- Stores embedding vector
+- Stores original text in metadata
+- Enables contextual retrieval
 
-### Run the Container
+### 3️⃣ Semantic Query
+```bash
+results = index.query(vector=query_vector, top_k=6)
+```
+- Retrieves most semantically similar chunks
+- Enables meaning-based search
+- Acts as the retrieval layer of RAG
 
-The container exposes port `8080` and stores data in `/data` inside container. You should persist this data using a docker volume.
+---
+
+## Setup & Execution Guide
+
+### Step 1 — Clone Repository
 
 ```bash
-docker run \
-  -p 8080:8080 \
-  -v endee-data:/data \
-  -e NDD_AUTH_TOKEN="your_secure_token" \
-  --name endee-server \
-  endee-oss:latest
+git clone https://github.com/YA-shiKa/endee.git
+cd endee
 ```
 
-leave `NDD_AUTH_TOKEN` empty or remove it to run endee without authentication.
+### Step 2 — Run Endee Server
 
-### Alternatively: Docker Compose
+You can run Endee using Docker
 
-You can also use `docker-compose` to run the service.
-
-1. Start the container:
-   ```bash
-   docker-compose up
-   ```
-
----
-
-## 4. Running Docker container from registry
-
-You can run Endee directly using the pre-built image from Docker Hub without building locally.
-
-### Using Docker Compose
-
-Create a new directory for Endee:
-
+### Step 3 — Install Python Dependencies
 ```bash
-mkdir endee && cd endee
+cd ai-app
+pip install -r requirements.txt
 ```
+Required packages:
 
-Inside this directory, create a file named `docker-compose.yml` and copy the following content into it:
+- fastapi
+- uvicorn
+- sentence-transformers
+- pypdf
+- ollama
 
-```yaml
-services:
-  endee:
-    image: endeeio/endee-server:latest
-    container_name: endee-server
-    ports:
-      - "8080:8080"
-    environment:
-      NDD_NUM_THREADS: 0
-      NDD_AUTH_TOKEN: ""  # Optional: set for authentication
-    volumes:
-      - endee-data:/data
-    restart: unless-stopped
-
-volumes:
-  endee-data:
-```
-
-Then run:
+### Step 4 — Run Backend
 ```bash
-docker compose up -d
+uvicorn app:app --reload
 ```
 
-for more details visit [docs.endee.io](https://docs.endee.io/quick-start)
+Open browser:
+```bash
+http://127.0.0.1:8000
+```
+### Step 5 — Run Ollama (Required for LLM)
+```bash
+ollama pull mistral
+ollama run mistral
+```
+Make sure Ollama server is running.
 
----
+### 🧪 Testing Endee Integration
 
-## Contribution
-
-We welcome contributions from the community to help make vector search faster and more accessible for everyone. To contribute:
-
-* **Submit Pull Requests**: Have a fix or a new feature? Fork the repo, create a branch, and send a PR.
-* **Report Issues**: Found a bug or a performance bottleneck? Open an issue on GitHub with steps to reproduce it.
-* **Suggest Improvements**: We are always looking to optimize performance; feel free to suggest new CPU target optimizations or architectural enhancements.
-* **Feature Requests**: If there is a specific functionality you need, start a discussion in the issues section.
-
----
-
-## License
-
-Endee is open source software licensed under the
-**Apache License 2.0**.
-
-You are free to use, modify, and distribute this software for
-personal, commercial, and production use.
-
-See the LICENSE file for full license terms.
-
----
-
-## Trademark and Branding
-
-“Endee” and the Endee logo are trademarks of Endee Labs.
-
-The Apache License 2.0 does **not** grant permission to use the Endee name,
-logos, or branding in a way that suggests endorsement or affiliation.
-
-If you offer a hosted or managed service based on this software, you must:
-- Use your own branding
-- Avoid implying it is an official Endee service
-
-For trademark or branding permissions, contact: enterprise@endee.io
-
----
-
-## Third-Party Software
-
-This project includes or depends on third-party software components that are
-licensed under their respective open source licenses.
-
-Use of those components is governed by the terms and conditions of their
-individual licenses, not by the Apache License 2.0 for this project.
+You can test vector insertion:
+```bash
+python test_endee.py
+```
