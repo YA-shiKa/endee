@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Document Analysis AI</title>
+
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      background-image: url("https://atlasti.com/media/pages/research-hub/document-analysis/90cd27969c-1739281496/document-analysis-is-cost-effective-as-it-relies-on-existing-sources-of-data.avif");
+      background-size: cover;
+      background-position: center;
+    }
+    body::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.95);
+      width: 650px;
+      padding: 40px;
+      border-radius: 16px;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.3);
+      backdrop-filter: blur(5px);
+    }
+
+    h1 {
+      text-align: center;
+      margin-bottom: 30px;
+      color: #111;
+      font-weight: 600;
+      font-size: 28px;
+    }
+
+    h3 {
+      color: #333;
+      margin-top: 20px;
+    }
+
+    input[type="file"],
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      margin-bottom: 15px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 14px;
+      background: #f9f9f9;
+    }
+
+    input[type="text"]:focus {
+      outline: none;
+      border-color: #000;
+      background: #fff;
+    }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: none;
+      background: #000;     
+      color: white;
+      font-size: 15px;
+      cursor: pointer;
+      transition: 0.3s ease;
+      font-weight: 500;
+    }
+
+    button:hover {
+      background: #222;    
+    }
+
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f3f4f6;
+      border-radius: 8px;
+      min-height: 60px;
+      white-space: pre-wrap;
+      color: #111;
+      font-size: 14px;
+    }
+
+    .loader {
+      display: none;
+      text-align: center;
+      margin-top: 10px;
+      color: #000;
+      font-weight: 500;
+    }
+
+  </style>
+</head>
+<body>
+
+<div class="card">
+  <h1>📄 Document Analysis AI</h1>
+
+  <h3>Upload PDF</h3>
+  <input type="file" id="pdfInput">
+  <button onclick="uploadPDF()">Upload Document</button>
+
+  <h3>Ask Question</h3>
+  <input type="text" id="question" placeholder="Ask something about the document...">
+  <button onclick="askQuestion()">Analyze</button>
+
+  <div class="loader" id="loader">Analyzing document...</div>
+  <div id="result"></div>
+</div>
+
+<script>
+async function uploadPDF() {
+  const file = document.getElementById("pdfInput").files[0];
+  if (!file) return alert("Select a PDF");
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  const response = await fetch("/upload", {
+    method: "POST",
+    body: formData
+  });
+
+  const data = await response.json();
+  alert(data.message);
+}
+
+async function askQuestion() {
+  const question = document.getElementById("question").value;
+  const resultDiv = document.getElementById("result");
+  const loader = document.getElementById("loader");
+
+  if (!question) return alert("Enter a question");
+
+  loader.style.display = "block";
+  resultDiv.innerText = "";
+
+  const formData = new FormData();
+  formData.append("question", question);
+
+  try {
+    const response = await fetch("/ask", {
+      method: "POST",
+      body: formData
+    });
+
+    const data = await response.json();
+    resultDiv.innerText = data.answer;
+  } catch (err) {
+    resultDiv.innerText = "Error occurred.";
+  }
+
+  loader.style.display = "none";
+}
+</script>
+
+</body>
+</html>

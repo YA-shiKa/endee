@@ -30,3 +30,26 @@ frontend/*
 
 # DS Store
 .DS_Store
+venv/
+__pycache__/
+*.pyc
+uploads/
+.env
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+
+# Virtual environments
+venv/
+env/
+
+# VS Code
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+ai-app/static/images/
